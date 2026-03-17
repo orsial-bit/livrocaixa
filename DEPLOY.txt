@@ -1,0 +1,155 @@
+========================================================================
+LIVRO CAIXA - GUIA DE DEPLOY
+========================================================================
+
+REPOSITORIO
+-----------
+https://github.com/orsial-bit/livrocaixa
+
+APP EM PRODUCAO
+---------------
+https://AlexOrsi.pythonanywhere.com
+
+
+========================================================================
+OPCAO 1 - PYTHONANYWHERE (GRATUITO, atual)
+========================================================================
+
+LIMITACAO: precisa renovar manualmente todo mes (Web > Run until 1 month)
+
+PASSO A PASSO:
+
+1. Criar conta gratuita em https://pythonanywhere.com
+
+2. Consoles > Bash > colar:
+   git clone https://github.com/orsial-bit/livrocaixa.git
+   python3.12 -m pip install --user groq
+
+3. Web > Add a new web app > Flask > Python 3.12
+   - Quando perguntar o caminho, colocar:
+     /home/SEU_USUARIO/livrocaixa/livro_caixa.py
+
+4. Clicar no link do WSGI configuration file e substituir TODO o conteudo por:
+
+   import sys
+   import os
+   os.environ['GROQ_API_KEY'] = 'SUA_CHAVE_GROQ'
+   sys.path.insert(0, '/home/SEU_USUARIO/livrocaixa')
+   from livro_caixa import app as application
+
+5. Salvar (Ctrl+S)
+
+6. Web > Reload
+
+7. Acessar https://SEU_USUARIO.pythonanywhere.com
+
+ATENCAO: Se aparecer "Hello from Flask!" apos o reload:
+   - Ir ao Bash e executar:
+     cd /home/SEU_USUARIO/livrocaixa && git checkout -- livro_caixa.py
+   - Web > Reload novamente
+
+CHAVE GROQ: obter gratuitamente em https://console.groq.com > API Keys
+
+
+========================================================================
+OPCAO 2 - SERVIDOR PROPRIO 24/7 (VPS - recomendado para uso continuo)
+========================================================================
+
+Melhor custo-beneficio: Hetzner Cloud CX22 (~R$ 25/mes)
+Alternativa mais barata: Oracle Cloud Always Free (gratuito permanente)
+
+ORACLE CLOUD ALWAYS FREE (melhor opcao gratuita 24/7):
+- Acesse https://cloud.oracle.com > criar conta (precisa de cartao mas nao cobra)
+- Criar VM: Compute > Instances > Create Instance
+  - Shape: VM.Standard.A1.Flex (Always Free)
+  - OS: Ubuntu 22.04
+  - Adicionar chave SSH
+
+CONFIGURAR O SERVIDOR UBUNTU (via SSH):
+
+# Instalar dependencias
+sudo apt update && sudo apt install -y python3-pip python3-venv nginx git
+
+# Clonar o projeto
+git clone https://github.com/orsial-bit/livrocaixa.git
+cd livrocaixa
+
+# Criar ambiente virtual
+python3 -m venv venv
+source venv/bin/activate
+pip install flask groq gunicorn
+
+# Criar arquivo de servico systemd (roda 24/7, reinicia automaticamente)
+sudo nano /etc/systemd/system/livrocaixa.service
+
+# Conteudo do arquivo:
+[Unit]
+Description=Livro Caixa Flask App
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/livrocaixa
+Environment="GROQ_API_KEY=SUA_CHAVE_GROQ"
+ExecStart=/home/ubuntu/livrocaixa/venv/bin/gunicorn -w 2 -b 0.0.0.0:5000 livro_caixa:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+# Ativar e iniciar o servico
+sudo systemctl daemon-reload
+sudo systemctl enable livrocaixa
+sudo systemctl start livrocaixa
+
+# Verificar status
+sudo systemctl status livrocaixa
+
+ATUALIZAR O APP NO SERVIDOR:
+cd /home/ubuntu/livrocaixa
+git pull origin main
+sudo systemctl restart livrocaixa
+
+
+========================================================================
+OPCAO 3 - RODAR LOCALMENTE (Windows, desenvolvimento)
+========================================================================
+
+Requisitos: Python 3.12+, pip
+
+1. Instalar dependencias:
+   pip install flask groq gunicorn
+
+2. Definir a chave Groq:
+   $env:GROQ_API_KEY="gsk_sua_chave_aqui"
+
+3. Rodar o app:
+   python livro_caixa.py
+
+4. Acessar no browser: http://127.0.0.1:5000
+   Acessar no iPhone (mesma rede): http://IP_DO_PC:5000
+
+5. Liberar firewall (PowerShell como Administrador):
+   netsh advfirewall firewall add rule name="Flask 5000" dir=in action=allow protocol=TCP localport=5000
+
+
+========================================================================
+VARIAVEIS DE AMBIENTE NECESSARIAS
+========================================================================
+
+GROQ_API_KEY  - chave da API Groq (https://console.groq.com)
+               modelo usado: meta-llama/llama-4-scout-17b-16e-instruct
+               plano gratuito: suficiente para uso pessoal
+
+
+========================================================================
+ARQUIVOS DO PROJETO
+========================================================================
+
+livro_caixa.py   - aplicacao principal (Flask + HTML/CSS/JS)
+Procfile         - comando de start para Heroku/Render (web: gunicorn livro_caixa:app)
+requirements.txt - dependencias Python (flask, groq, gunicorn)
+DEPLOY.txt       - este arquivo
+
+
+========================================================================
